@@ -1,0 +1,33 @@
+pipelineTrigger:
+  enabled: webhook
+  webhook:
+    url: http://example.com
+    body:
+      branch: main
+  spinCli:
+    certFilePath: /hoge/hoge.conf
+cluster:
+  name: sample-cluster
+  certFilePath: /hoge/hoge/.kube/config
+target:
+  namespace: default
+  kind: replicaSet
+  labelSelector:
+    name: sample
+  currentVersionCriteria: largest
+checkInterval: 10s
+testcases:
+  - name: 正常系
+    states:
+      - name: 最初
+        pod:
+          new: "0"
+          current: ">=1"
+        endpoints:
+          - name: nginx
+            namespace: default
+            count: ">=1"
+          - name: nginx-sample
+            namespace: default
+            count: "0"
+      - name: 新podをルーティング対象にいれる
