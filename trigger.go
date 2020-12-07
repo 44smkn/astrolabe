@@ -9,7 +9,7 @@ import (
 )
 
 type Trigger interface {
-	Pull() error
+	Pull() (func(), error)
 }
 
 type WebhookOnSpinnaker struct {
@@ -35,19 +35,21 @@ func NewTrigger(trigger PipelineTrigger) (Trigger, error) {
 	}
 }
 
-func (w *WebhookOnSpinnaker) Pull() error {
+func (w *WebhookOnSpinnaker) Pull() (func(), error) {
 	buf, err := json.Marshal(w.Body)
 	if err != nil {
-		return errors.Wrap(err, "failed to serialize body of the webhook request.")
+		return nil, errors.Wrap(err, "failed to serialize body of the webhook request.")
 	}
 	_, err = http.Post(w.URL, "application/json", bytes.NewReader(buf))
 	if err != nil {
-		return errors.Wrap(err, "webhook request is failed.")
+		return nil, errors.Wrap(err, "webhook request is failed.")
 	}
-	return nil
+	return func() {
+		// confirm whether pipeline execution finished using its id.
+	}, nil
 }
 
-func (s *SpinCli) Pull() error {
+func (s *SpinCli) Pull() (func(), error) {
 	//TODO: implement
-	return nil
+	return func() {}, nil
 }
