@@ -12,7 +12,7 @@ type Trigger interface {
 	Pull() error
 }
 
-type Webhook struct {
+type WebhookOnSpinnaker struct {
 	URL  string            `yaml:"url"`
 	Body map[string]string `yaml:"body"`
 }
@@ -24,7 +24,7 @@ type SpinCli struct {
 func NewTrigger(trigger PipelineTrigger) (Trigger, error) {
 	switch trigger.Enabled {
 	case "webhook":
-		return &Webhook{
+		return &WebhookOnSpinnaker{
 			trigger.Webhook.URL,
 			trigger.Webhook.Body,
 		}, nil
@@ -35,7 +35,7 @@ func NewTrigger(trigger PipelineTrigger) (Trigger, error) {
 	}
 }
 
-func (w *Webhook) Pull() error {
+func (w *WebhookOnSpinnaker) Pull() error {
 	buf, err := json.Marshal(w.Body)
 	if err != nil {
 		return errors.Wrap(err, "failed to serialize body of the webhook request.")
