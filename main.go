@@ -12,7 +12,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 func discontinue(msg string, exitCode int) {
@@ -47,22 +46,15 @@ func main() {
 
 	// Authentication to the cluster
 	kubeconfig := plan.Cluster.CertFilePath
-	if _, err := os.Stat(kubeconfig); os.IsNotExist(err) {
-		discontinue(fmt.Sprintf("%s does not exist\n", file), 1)
-	}
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil {
-		discontinue(err.Error(), 1)
-	}
-	clientset, err := kubernetes.NewForConfig(config)
+	provider, err := NewKubernetesProvider(kubeconfig)
 	if err != nil {
 		discontinue(err.Error(), 1)
 	}
 
-	// テストケースごとに実行
+	// Execute each testcase
 	for _, testcase := range plan.Testcases {
 		// find current active Replicaset
-		rsList, err := fetchReplicaSets(clientset, plan.Target.Namespace, plan.Target.LabelSelector)
+		rsList, err := fetchReplicaSets(provider.Client, plan.Target.Namespace, plan.Target.LabelSelector)
 		currentRs, err := findReplicaSet(rsList, plan.Target.CurrentVersionCriteria)
 		if err != nil {
 			discontinue(err.Error(), 1)
@@ -78,14 +70,15 @@ func main() {
 		if err != nil {
 			discontinue(fmt.Sprintf("failed to load trigger configuration. %v\n", err), 1)
 		}
-		if err := trigger.Pull(); err != nil {
+		confirmFunc, err := trigger.Pull()
+		if err != nil {
 			discontinue(fmt.Sprintf("failed to pull trigger of deploy pipeline. %v\n", err), 1)
 		}
 
 		// find new ReplicaSet
 		var testTargetRs *v1.ReplicaSet
 		for {
-			rsList, _ := fetchReplicaSets(clientset, plan.Target.Namespace, plan.Target.LabelSelector)
+			rsList, _ := fetchReplicaSets(provider.Client, plan.Target.Namespace, plan.Target.LabelSelector)
 			maybeNewest, _ := findReplicaSet(rsList, "newest")
 			if maybeNewest.Name != newestRs.Name {
 				testTargetRs = maybeNewest
@@ -104,7 +97,9 @@ func main() {
 				} else if ok {
 					break
 				}
+
 				time.Sleep(time.Duration(plan.CheckIntervalSeconds) * time.Second)
+				confirmFunc()
 			}
 		}
 	}

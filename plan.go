@@ -10,7 +10,7 @@ type Plan struct {
 
 type PipelineTrigger struct {
 	Enabled string `yaml:"enabled"`
-	Webhook Webhook
+	Webhook WebhookOnSpinnaker
 	SpinCli SpinCli
 }
 
