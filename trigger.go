@@ -3,18 +3,22 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/pkg/errors"
 )
 
 type Trigger interface {
-	Pull() (func(), error)
+	Pull() error
+	IsCompleted() (bool, error)
 }
 
 type WebhookOnSpinnaker struct {
-	URL  string            `yaml:"url"`
-	Body map[string]string `yaml:"body"`
+	URL          string            `yaml:"url"`
+	Body         map[string]string `yaml:"body"`
+	CertFilePath string            `yaml:"certFilePath"`
+	EventId      string
 }
 
 type SpinCli struct {
@@ -25,8 +29,10 @@ func NewTrigger(trigger PipelineTrigger) (Trigger, error) {
 	switch trigger.Enabled {
 	case "webhook":
 		return &WebhookOnSpinnaker{
-			trigger.Webhook.URL,
-			trigger.Webhook.Body,
+			URL:          trigger.Webhook.URL,
+			Body:         trigger.Webhook.Body,
+			CertFilePath: trigger.Webhook.CertFilePath,
+			EventId:      "",
 		}, nil
 	case "spinCli":
 		return &SpinCli{trigger.SpinCli.CertFilePath}, nil
@@ -35,21 +41,38 @@ func NewTrigger(trigger PipelineTrigger) (Trigger, error) {
 	}
 }
 
-func (w *WebhookOnSpinnaker) Pull() (func(), error) {
+func (w *WebhookOnSpinnaker) Pull() error {
 	buf, err := json.Marshal(w.Body)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to serialize body of the webhook request.")
+		return errors.Wrap(err, "failed to serialize body of the webhook request.")
 	}
-	_, err = http.Post(w.URL, "application/json", bytes.NewReader(buf))
+	resp, err := http.Post(w.URL, "application/json", bytes.NewReader(buf))
 	if err != nil {
-		return nil, errors.Wrap(err, "webhook request is failed.")
+		return errors.Wrap(err, "webhook request is failed.")
 	}
-	return func() {
-		// confirm whether pipeline execution finished using its id.
-	}, nil
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	m := make(map[string]string)
+	err = json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	w.EventId = m["eventId"]
+
+	return nil
 }
 
-func (s *SpinCli) Pull() (func(), error) {
+func (w *WebhookOnSpinnaker) IsCompleted() (bool, error) {
+	return true, nil
+}
+
+func (s *SpinCli) Pull() error {
 	//TODO: implement
-	return func() {}, nil
+	return nil
+}
+
+func (s *SpinCli) IsCompleted() (bool, error) {
+	//TODO: implement
+	return false, nil
 }

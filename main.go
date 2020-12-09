@@ -70,7 +70,7 @@ func main() {
 		if err != nil {
 			discontinue(fmt.Sprintf("failed to load trigger configuration. %v\n", err), 1)
 		}
-		confirmFunc, err := trigger.Pull()
+		err = trigger.Pull()
 		if err != nil {
 			discontinue(fmt.Sprintf("failed to pull trigger of deploy pipeline. %v\n", err), 1)
 		}
@@ -99,7 +99,6 @@ func main() {
 				}
 
 				time.Sleep(time.Duration(plan.CheckIntervalSeconds) * time.Second)
-				confirmFunc()
 			}
 		}
 	}
