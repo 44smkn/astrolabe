@@ -25,6 +25,23 @@ type SpinCli struct {
 	CertFilePath string `yaml:"certFilePath"`
 }
 
+type SpinCliConfig struct {
+	Gate struct {
+		Endpoint string `yaml:"endpoint"`
+	} `yaml:"gate"`
+	Auth struct {
+		Oauth2 struct {
+			CachedToken struct {
+				AccessToken  string `yaml:"access_token"`
+				TokenType    string `yaml:"token_type"`
+				RefreshToken string `yaml:"refresh_token"`
+				Expiry       struct {
+				} `yaml:"expiry"`
+			} `yaml:"cachedToken"`
+		} `yaml:"oauth2"`
+	} `yaml:"auth"`
+}
+
 func NewTrigger(trigger PipelineTrigger) (Trigger, error) {
 	switch trigger.Enabled {
 	case "webhook":
@@ -64,6 +81,7 @@ func (w *WebhookOnSpinnaker) Pull() error {
 }
 
 func (w *WebhookOnSpinnaker) IsCompleted() (bool, error) {
+
 	return true, nil
 }
 
