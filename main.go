@@ -2,12 +2,10 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
 	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -26,19 +24,8 @@ func main() {
 		discontinue("Usage: astrolabe [CONFIG FILEPATH]", 1)
 	}
 
-	// File Existence Checking
-	file := os.Args[1]
-	if _, err := os.Stat(file); os.IsNotExist(err) {
-		discontinue(fmt.Sprintf("%s does not exist\n", file), 1)
-	}
-
-	// Loading the configuration file
-	data, err := ioutil.ReadFile(file)
-	if err != nil {
-		discontinue(fmt.Sprintf("failed to read file. %v\n", err), 1)
-	}
-	plan := Plan{}
-	if err := yaml.Unmarshal([]byte(data), &plan); err != nil {
+	var plan Plan
+	if err := DeserializeYamlFile(os.Args[1], &plan); err != nil {
 		discontinue(fmt.Sprintf("failed to parse configuration file. %v\n", err), 1)
 	}
 

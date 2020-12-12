@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
+	"golang.org/x/oauth2"
 )
 
 type Trigger interface {
@@ -15,10 +16,12 @@ type Trigger interface {
 }
 
 type WebhookOnSpinnaker struct {
-	URL          string            `yaml:"url"`
-	Body         map[string]string `yaml:"body"`
-	CertFilePath string            `yaml:"certFilePath"`
-	EventId      string
+	URL           string            `yaml:"url"`
+	Body          map[string]string `yaml:"body"`
+	SpinCliConfig string            `yaml:"spinCliConfig"`
+	EventId       string
+	GateEndpoint  string
+	SpinToken     *oauth2.Token
 }
 
 type SpinCli struct {
@@ -31,13 +34,7 @@ type SpinCliConfig struct {
 	} `yaml:"gate"`
 	Auth struct {
 		Oauth2 struct {
-			CachedToken struct {
-				AccessToken  string `yaml:"access_token"`
-				TokenType    string `yaml:"token_type"`
-				RefreshToken string `yaml:"refresh_token"`
-				Expiry       struct {
-				} `yaml:"expiry"`
-			} `yaml:"cachedToken"`
+			CachedToken *oauth2.Token `yaml:"cachedToken"`
 		} `yaml:"oauth2"`
 	} `yaml:"auth"`
 }
@@ -45,12 +42,14 @@ type SpinCliConfig struct {
 func NewTrigger(trigger PipelineTrigger) (Trigger, error) {
 	switch trigger.Enabled {
 	case "webhook":
-		return &WebhookOnSpinnaker{
-			URL:          trigger.Webhook.URL,
-			Body:         trigger.Webhook.Body,
-			CertFilePath: trigger.Webhook.CertFilePath,
-			EventId:      "",
-		}, nil
+		var config SpinCliConfig
+		if err := DeserializeYamlFile(trigger.Webhook.SpinCliConfig, config); err != nil {
+			return nil, err
+		}
+		webhook := trigger.Webhook
+		webhook.GateEndpoint = config.Gate.Endpoint
+		webhook.SpinToken = config.Auth.Oauth2.CachedToken
+		return &webhook, nil
 	case "spinCli":
 		return &SpinCli{trigger.SpinCli.CertFilePath}, nil
 	default:
@@ -80,8 +79,19 @@ func (w *WebhookOnSpinnaker) Pull() error {
 	return nil
 }
 
+// https://spinnaker.io/guides/user/pipeline/searching/
 func (w *WebhookOnSpinnaker) IsCompleted() (bool, error) {
-
+	req, err := http.NewRequest(http.MethodGet, w.GateEndpoint, nil)
+	if err != nil {
+		return false, err
+	}
+	w.SpinToken.SetAuthHeader(req)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close()
+	// TODO: responseからステータスを読み取る
 	return true, nil
 }
 

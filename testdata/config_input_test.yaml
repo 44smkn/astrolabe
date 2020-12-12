@@ -4,7 +4,7 @@ pipelineTrigger:
     url: http://example.com
     body:
       branch: main
-    certFilePath: /hoge/spin.config.yaml
+    spinCliConfig: /hoge/spin.config.yaml
   spinCli:
     certFilePath: /hoge/hoge.conf
 cluster:
